@@ -10,8 +10,8 @@ import imageio
 import os
 
 # Hyperparameters (giữ nguyên từ code huấn luyện)
-MAX_W = 150
-MAX_H = 150
+MAX_W = 100
+MAX_H = 100
 MAX_PRODUCTS = 100
 
 # Đọc dữ liệu từ file CSV (giống code huấn luyện)
@@ -105,8 +105,8 @@ def select_action(model, state, env):
     action = {'stock_idx': stock_idx, 'size': size, 'position': position}
     return action
 
-# Visualize và lưu GIF
-def visualize_and_save_gif(file_path, model_path, batch_id=1, max_steps=200):
+# Visualize, lưu GIF và vẽ biểu đồ đánh giá
+def visualize_and_save_gif(file_path, model_path, batch_id=2, max_steps=400):
     # Đọc dữ liệu
     data = load_data(file_path)
     batch_data = data[batch_id]
@@ -137,6 +137,9 @@ def visualize_and_save_gif(file_path, model_path, batch_id=1, max_steps=200):
     step = 0
     frames = []  # Danh sách lưu các frame hình ảnh
     total_reward = 0
+    rewards = []  # Lưu reward qua các bước
+    filled_ratios = []  # Lưu filled_ratio qua các bước
+    trim_losses = []  # Lưu trim_loss qua các bước
     
     # Mô phỏng quá trình cắt
     while not done and step < max_steps:
@@ -153,6 +156,9 @@ def visualize_and_save_gif(file_path, model_path, batch_id=1, max_steps=200):
             reward = -0.1
         
         total_reward += reward
+        rewards.append(reward)
+        filled_ratios.append(info['filled_ratio'])
+        trim_losses.append(info['trim_loss'])
         
         # Lấy frame từ môi trường
         frame = env.render()
@@ -173,14 +179,49 @@ def visualize_and_save_gif(file_path, model_path, batch_id=1, max_steps=200):
     # Lưu GIF
     output_dir = 'results'
     os.makedirs(output_dir, exist_ok=True)
-    gif_path = os.path.join(output_dir, f'cutting_batch_v1_{batch_id}_visualization.gif')
+    gif_path = os.path.join(output_dir, f'cutting_batch_{batch_id}_visualization.gif')
     imageio.mimsave(gif_path, frames, fps=10)  # 10 FPS
     print(f"GIF saved to {gif_path}")
+    
+    # Vẽ biểu đồ đánh giá
+    steps = list(range(len(rewards)))
+    
+    plt.figure(figsize=(15, 5))
+    
+    # Biểu đồ Reward
+    plt.subplot(1, 3, 1)
+    plt.plot(steps, rewards, label='Reward')
+    plt.xlabel('Step')
+    plt.ylabel('Reward')
+    plt.title('Reward over Steps')
+    plt.legend()
+    
+    # Biểu đồ Filled Ratio
+    plt.subplot(1, 3, 2)
+    plt.plot(steps, filled_ratios, label='Filled Ratio', color='green')
+    plt.xlabel('Step')
+    plt.ylabel('Filled Ratio')
+    plt.title('Filled Ratio over Steps')
+    plt.legend()
+    
+    # Biểu đồ Trim Loss
+    plt.subplot(1, 3, 3)
+    plt.plot(steps, trim_losses, label='Trim Loss', color='red')
+    plt.xlabel('Step')
+    plt.ylabel('Trim Loss')
+    plt.title('Trim Loss over Steps')
+    plt.legend()
+    
+    plt.tight_layout()
+    plot_path = os.path.join(output_dir, f'performance_batch_{batch_id}.png')
+    plt.savefig(plot_path)
+    plt.show()
+    print(f"Performance plot saved to {plot_path}")
     
     # Đóng môi trường
     env.close()
 
 if __name__ == "__main__":
     file_path = "data/data.csv"  # Đường dẫn đến file dữ liệu
-    model_path = "results/actor_critic_batch_1.pth"  # Đường dẫn đến file mô hình .pth
-    visualize_and_save_gif(file_path, model_path, batch_id=1)
+    model_path = "actor_critic_batch_1.pth"  # Đường dẫn đến file mô hình .pth
+    visualize_and_save_gif(file_path, model_path, batch_id=2)
